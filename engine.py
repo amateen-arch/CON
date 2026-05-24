@@ -3,21 +3,39 @@ import os
 import random
 from PIL import Image, ImageDraw, ImageFont
 
-# 1. Update your configuration to store explicit variant rules for individual fonts
+# Restructured to support distinct font profiles natively
 TOOL_CONFIGS = {
-    'pen': {
-        'color': (12, 28, 94, 255),
-        'variants': [
-            {'path': 'assets/pen1.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
-            {'path': 'assets/pen2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
-        ]
+    'Font 1': {
+        'pen': {
+            'color': (12, 28, 94, 255),
+            'variants': [
+                {'path': 'assets/pen1.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+                {'path': 'assets/pen2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
+            ]
+        },
+        'marker': {
+            'color': (40, 65, 135, 255),
+            'variants': [
+                {'path': 'assets/marker1.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
+                {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
+            ]
+        }
     },
-    'marker': {
-        'color': (40, 65, 135, 255),
-        'variants': [
-            {'path': 'assets/marker1.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},     # Normal marker
-            {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}    # <--- Made this a bit bolder!
-        ]
+    'Font 2': {
+        'pen': {
+            'color': (12, 28, 94, 255),
+            'variants': [
+                {'path': 'assets/architect1.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+                {'path': 'assets/architect2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
+            ]
+        },
+        'marker': {
+            'color': (40, 65, 135, 255),
+            'variants': [
+                {'path': 'assets/marker1.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
+                {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
+            ]
+        }
     }
 }
 
@@ -66,22 +84,25 @@ def get_interpolated_y(current_x: float, line_coordinates: list) -> float:
     return line_coordinates[0][1]
 
 FONTS_CACHE = {}
-def get_cached_fonts():
-    """Loads and caches actual font objects paired with their custom configuration profiles."""
+def get_cached_fonts(font_profile: str):
+    """Loads and caches actual font objects paired with their profile keys."""
     global FONTS_CACHE
-    if not FONTS_CACHE:
-        for tool, cfg in TOOL_CONFIGS.items():
-            FONTS_CACHE[tool] = []
+    if font_profile not in FONTS_CACHE:
+        FONTS_CACHE[font_profile] = {}
+        profile_cfg = TOOL_CONFIGS[font_profile]
+        for tool, cfg in profile_cfg.items():
+            FONTS_CACHE[font_profile][tool] = []
             for var in cfg['variants']:
                 try:
                     font_obj = ImageFont.truetype(var['path'], size=var['fontsize'])
-                    FONTS_CACHE[tool].append((font_obj, var))
+                    FONTS_CACHE[font_profile][tool].append((font_obj, var))
                 except IOError:
-                    FONTS_CACHE[tool].append((ImageFont.load_default(), var))
-    return FONTS_CACHE
+                    FONTS_CACHE[font_profile][tool].append((ImageFont.load_default(), var))
+    return FONTS_CACHE[font_profile]
 
-def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type: str = "register") -> tuple:
-    fonts = get_cached_fonts()
+# Added font_profile parameter to pull specific configurations seamlessly
+def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type: str = "register", font_profile: str = "Font 1") -> tuple:
+    fonts = get_cached_fonts(font_profile)
     pages = []
     page_offsets = [0]
     
@@ -93,16 +114,17 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
     line_idx = 0
     current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
 
+    forced_midword_wrap = False
+
     idx = 0
     while idx < len(structured_chars):
         char, is_bold = structured_chars[idx]
         tool_type = 'marker' if is_bold else 'pen'
-        cfg = TOOL_CONFIGS[tool_type]
+        cfg = TOOL_CONFIGS[font_profile][tool_type]
 
         available_variants = fonts[tool_type]
         chosen_font_obj, chosen_font_rules = random.choice(available_variants)
 
-        # Handle explicit line break layout commands
         if char == '\n':
             line_idx += 1
             if line_idx >= MAX_LINES_PER_PAGE:
@@ -112,13 +134,13 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
                 line_idx = 0
             current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
             idx += 1
-            return_triggered = True
+            forced_midword_wrap = False
             continue
 
-        # Lookahead boundary calculation for upcoming structural words
         word_width = 0
-        is_word_start = char not in [' ', '\t'] and (idx == 0 or structured_chars[idx-1][0] in [' ', '\n', '\t'])
-        
+        is_word_start = forced_midword_wrap or (char not in [' ', '\t'] and (idx == 0 or structured_chars[idx-1][0] in [' ', '\n', '\t']))
+        forced_midword_wrap = False 
+
         if is_word_start:
             lookahead_idx = idx
             while lookahead_idx < len(structured_chars):
@@ -131,12 +153,9 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
                 word_width += (bbox[2] - bbox[0])
                 lookahead_idx += 1
 
-        # Check single-character width bounding logic to measure ahead accurately
         char_bbox = current_draw.textbbox((0, 0), char, font=chosen_font_obj)
         char_w = (char_bbox[2] - char_bbox[0]) if (char_bbox[2] - char_bbox[0]) > 0 else 8
 
-        # --- RE-ENGINEERED WRAPPING CRITERIA ---
-        # Trigger line break if word exceeds line limit OR if a single character breaks margin bounds
         should_wrap = (is_word_start and (current_x + word_width > MAX_X_BOUNDARY) and (word_width <= (MAX_X_BOUNDARY - MASTER_LINE_COORDINATES[line_idx][0][0]))) or (current_x + char_w > MAX_X_BOUNDARY)
 
         if should_wrap:
@@ -147,8 +166,10 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
                 current_img, current_draw = create_new_page()
                 line_idx = 0
             current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
+            
+            if char not in [' ', '\t']:
+                forced_midword_wrap = True
 
-        # Calculate dynamic text placement base coordinates
         dynamic_y = get_interpolated_y(current_x, MASTER_LINE_COORDINATES[line_idx])
         
         current_draw.text(
@@ -160,7 +181,6 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
             stroke_fill=cfg['color']
         )
         
-        # Increment cursor coordinate positions
         current_x += char_w
         idx += 1
 

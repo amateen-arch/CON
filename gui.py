@@ -36,14 +36,12 @@ class RegisterApp:
         toolbar = ttk.Frame(left_frame)
         toolbar.pack(fill=tk.X, pady=(0, 5))
         
-        # Tools packed to the left
         ttk.Button(toolbar, text="🖍️ Marker", command=self.apply_marker_format).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="🖊️ Pen", command=self.clear_marker_format).pack(side=tk.LEFT, padx=2)
         
         self.btn_apply = tk.Button(toolbar, text="⚡ Apply", font=("Arial", 9, "bold"), bg="#0078d7", fg="white", activebackground="#005a9e", activeforeground="white", padx=6, command=self.trigger_canvas_render)
         self.btn_apply.pack(side=tk.LEFT, padx=5)
         
-        # --- ADDED: Reminder text typed right next to the Apply button ---
         self.reminder_lbl = ttk.Label(
             toolbar, 
             text="Always click apply for the changes to appear!", 
@@ -52,10 +50,8 @@ class RegisterApp:
         )
         self.reminder_lbl.pack(side=tk.LEFT, padx=5)
         
-        # Save PDF button at the top-right corner of the editor panel
         ttk.Button(toolbar, text="💾 Save PDF", command=self.save_as_pdf).pack(side=tk.RIGHT, padx=2)
         
-        # Text input container matching margins exactly
         editor_scroll_container = ttk.Frame(left_frame)
         editor_scroll_container.pack(fill=tk.Y, side=tk.LEFT, expand=False)
 
@@ -95,12 +91,19 @@ class RegisterApp:
         
         paper_selection_bar = ttk.Frame(self.preview_container)
         paper_selection_bar.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(paper_selection_bar, text="Paper:").pack(side=tk.LEFT, padx=2)
         
-        self.paper_selector = ttk.Combobox(paper_selection_bar, values=list(self.paper_paths.keys()), state="readonly", width=15)
+        ttk.Label(paper_selection_bar, text="Paper:").pack(side=tk.LEFT, padx=2)
+        self.paper_selector = ttk.Combobox(paper_selection_bar, values=list(self.paper_paths.keys()), state="readonly", width=14)
         self.paper_selector.set("Register Page")
         self.paper_selector.pack(side=tk.LEFT, padx=5)
         self.paper_selector.bind("<<ComboboxSelected>>", lambda event: self.trigger_canvas_render())
+        
+        # --- ADDED FONT PRESET SELECTOR DROPDOWN ---
+        ttk.Label(paper_selection_bar, text="Font:").pack(side=tk.LEFT, padx=2)
+        self.font_selector = ttk.Combobox(paper_selection_bar, values=["Font 1", "Font 2"], state="readonly", width=8)
+        self.font_selector.set("Font 1")
+        self.font_selector.pack(side=tk.LEFT, padx=5)
+        self.font_selector.bind("<<ComboboxSelected>>", lambda event: self.trigger_canvas_render())
         
         self.status_lbl = ttk.Label(paper_selection_bar, text="Page 1 of 1", font=("Arial", 10, "bold"))
         self.status_lbl.pack(side=tk.RIGHT, padx=10)
@@ -115,7 +118,7 @@ class RegisterApp:
         self.spinner_canvas = tk.Canvas(self.overlay_layer, width=180, height=100, bg="#ffffff", highlightthickness=0)
         self.spinner_canvas.pack(expand=True)
         
-        # --- RIGHT PANEL (PAGES LIST THUMBNAILS WITH FIXES) ---
+        # --- RIGHT PANEL ---
         right_frame = ttk.LabelFrame(main_paned, text=" Pages ")
         main_paned.add(right_frame, weight=1)
         
@@ -135,7 +138,6 @@ class RegisterApp:
     def on_mousewheel_scroll(self, event):
         x, y = self.root.winfo_pointerxy()
         widget_under_mouse = self.root.winfo_containing(x, y)
-        
         if widget_under_mouse and (str(widget_under_mouse).startswith(str(self.thumb_canvas)) or "thumb" in str(widget_under_mouse)):
             if event.num == 4:    
                 self.thumb_canvas.yview_scroll(-1, "units")
@@ -207,13 +209,19 @@ class RegisterApp:
         selected_paper_name = self.paper_selector.get()
         chosen_bg_path = self.paper_paths[selected_paper_name]
         engine_paper_tag = "a4" if "A4" in selected_paper_name else "register"
+        
+        # Safe extraction of chosen font profile string parameter
+        selected_font_profile = self.font_selector.get()
 
         try:
-            self.generated_pages_stream, self.page_offsets = render_chars_to_pages(chosen_bg_path, structured_chars, paper_type=engine_paper_tag)
+            self.generated_pages_stream, self.page_offsets = render_chars_to_pages(
+                chosen_bg_path, 
+                structured_chars, 
+                paper_type=engine_paper_tag,
+                font_profile=selected_font_profile
+            )
             
-            # Force the view index to stick onto the very first page
             self.selected_viewing_page_idx = 0
-                
             self.refresh_thumbnails_sidebar()
             self.switch_active_preview_page(self.selected_viewing_page_idx, auto_scroll_text=False)
         except Exception as e:
@@ -225,8 +233,6 @@ class RegisterApp:
         if 0 <= page_index < len(self.generated_pages_stream):
             self.selected_viewing_page_idx = page_index
             display_img = self.generated_pages_stream[page_index].copy()
-            
-            # Scaled constraints safely to 500x720 to show whole image perfectly
             display_img.thumbnail((500, 720))
             
             self.main_preview_photo = ImageTk.PhotoImage(display_img)
