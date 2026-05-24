@@ -1,23 +1,32 @@
-# engine.py
 import os
+import sys
 import random
 from PIL import Image, ImageDraw, ImageFont
 
-# Restructured to support distinct font profiles natively
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+# Restructured to support distinct font profiles natively with dynamic resource paths
 TOOL_CONFIGS = {
     'Font 1': {
         'pen': {
             'color': (12, 28, 94, 255),
             'variants': [
-                {'path': 'assets/pen1.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
-                {'path': 'assets/pen2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
+                {'path': resource_path('assets/pen1.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+                {'path': resource_path('assets/pen2.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
             ]
         },
         'marker': {
             'color': (40, 65, 135, 255),
             'variants': [
-                {'path': 'assets/marker1.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
-                {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
+                {'path': resource_path('assets/marker1.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
+                {'path': resource_path('assets/marker2.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
             ]
         }
     },
@@ -25,15 +34,15 @@ TOOL_CONFIGS = {
         'pen': {
             'color': (12, 28, 94, 255),
             'variants': [
-                {'path': 'assets/architect1.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
-                {'path': 'assets/architect2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
+                {'path': resource_path('assets/architect1.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+                {'path': resource_path('assets/architect2.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
             ]
         },
         'marker': {
             'color': (40, 65, 135, 255),
             'variants': [
-                {'path': 'assets/marker1.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
-                {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
+                {'path': resource_path('assets/marker1.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
+                {'path': resource_path('assets/marker2.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
             ]
         }
     }
@@ -68,11 +77,13 @@ MAX_LINES_PER_PAGE = len(MASTER_LINE_COORDINATES)
 IMAGE_CACHE = {}
 
 def get_base_image(bg_image_path: str):
-    if bg_image_path not in IMAGE_CACHE:
-        if not os.path.exists(bg_image_path):
-            raise FileNotFoundError(f"Could not find background file: {bg_image_path}")
-        IMAGE_CACHE[bg_image_path] = Image.open(bg_image_path)
-    return IMAGE_CACHE[bg_image_path].copy()
+    # Resolve background paths dynamically too
+    resolved_path = resource_path(bg_image_path)
+    if resolved_path not in IMAGE_CACHE:
+        if not os.path.exists(resolved_path):
+            raise FileNotFoundError(f"Could not find background file: {resolved_path}")
+        IMAGE_CACHE[resolved_path] = Image.open(resolved_path)
+    return IMAGE_CACHE[resolved_path].copy()
 
 def get_interpolated_y(current_x: float, line_coordinates: list) -> float:
     if current_x <= line_coordinates[0][0]: return line_coordinates[0][1]
@@ -100,7 +111,6 @@ def get_cached_fonts(font_profile: str):
                     FONTS_CACHE[font_profile][tool].append((ImageFont.load_default(), var))
     return FONTS_CACHE[font_profile]
 
-# Added font_profile parameter to pull specific configurations seamlessly
 def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type: str = "register", font_profile: str = "Font 1") -> tuple:
     fonts = get_cached_fonts(font_profile)
     pages = []

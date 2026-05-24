@@ -1,10 +1,19 @@
-# gui.py
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from PIL import ImageTk
 import os
+import sys  # <-- Added for PyInstaller compatibility
 
 from engine import render_chars_to_pages
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class RegisterApp:
     def __init__(self, root):
@@ -12,9 +21,10 @@ class RegisterApp:
         self.root.title("Premium High-Speed Writer Workspace")
         self.root.geometry("1400x900") 
         
+        # --- FIXED: Wrapped asset paths dynamically ---
         self.paper_paths = {
-            "Register Page": "assets/register_bg.png",
-            "Blank A4 Paper": "assets/blank_a4_bg.png"
+            "Register Page": resource_path("assets/register_bg.png"),
+            "Blank A4 Paper": resource_path("assets/blank_a4_bg.png")
         }
         
         self.generated_pages_stream = [] 
@@ -278,4 +288,5 @@ class RegisterApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = RegisterApp(root)
+    root.state('zoomed')
     root.mainloop()
