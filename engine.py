@@ -1,15 +1,23 @@
 # engine.py
 import os
+import random
 from PIL import Image, ImageDraw, ImageFont
 
+# 1. Update your configuration to store explicit variant rules for individual fonts
 TOOL_CONFIGS = {
     'pen': {
-        'fontsize': 22, 'ybias': 22,
-        'font_path': 'assets/pen.ttf', 'color': (12, 28, 94, 255)
+        'color': (12, 28, 94, 255),
+        'variants': [
+            {'path': 'assets/pen.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+            {'path': 'assets/pen2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
+        ]
     },
     'marker': {
-        'fontsize': 28, 'ybias': 27,
-        'font_path': 'assets/marker.ttf', 'color': (6, 14, 55, 255)
+        'color': (40, 65, 135, 255),
+        'variants': [
+            {'path': 'assets/marker.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},     # Normal marker
+            {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}    # <--- Made this a bit bolder!
+        ]
     }
 }
 
@@ -38,48 +46,51 @@ MASTER_LINE_COORDINATES = [
 ]
 
 MAX_X_BOUNDARY = 730 
-MAX_LINES_PER_PAGE = len(MASTER_LINE_COORDINATES) # 21 lines max per page asset
+MAX_LINES_PER_PAGE = len(MASTER_LINE_COORDINATES)
+IMAGE_CACHE = {}
+
+def get_base_image(bg_image_path: str):
+    if bg_image_path not in IMAGE_CACHE:
+        if not os.path.exists(bg_image_path):
+            raise FileNotFoundError(f"Could not find background file: {bg_image_path}")
+        IMAGE_CACHE[bg_image_path] = Image.open(bg_image_path)
+    return IMAGE_CACHE[bg_image_path].copy()
 
 def get_interpolated_y(current_x: float, line_coordinates: list) -> float:
-    if current_x <= line_coordinates[0][0]:
-        return line_coordinates[0][1]
-    if current_x >= line_coordinates[-1][0]:
-        return line_coordinates[-1][1]
-        
+    if current_x <= line_coordinates[0][0]: return line_coordinates[0][1]
+    if current_x >= line_coordinates[-1][0]: return line_coordinates[-1][1]
     for i in range(len(line_coordinates) - 1):
-        pt1 = line_coordinates[i]
-        pt2 = line_coordinates[i+1]
+        pt1, pt2 = line_coordinates[i], line_coordinates[i+1]
         if pt1[0] <= current_x <= pt2[0]:
-            ratio = (current_x - pt1[0]) / (pt2[0] - pt1[0])
-            return pt1[1] + ratio * (pt2[1] - pt1[1])
-            
+            return pt1[1] + ((current_x - pt1[0]) / (pt2[0] - pt1[0])) * (pt2[1] - pt1[1])
     return line_coordinates[0][1]
 
-def render_chars_to_pages(bg_image_path: str, structured_chars: list) -> list:
-    """
-    Renders structured characters, dynamically overflowing onto new pages when needed.
-    :return: A list of processed PIL Image objects.
-    """
-    if not os.path.exists(bg_image_path):
-        raise FileNotFoundError(f"Could not find background file: {bg_image_path}")
+FONTS_CACHE = {}
+def get_cached_fonts():
+    """Loads and caches actual font objects paired with their custom configuration profiles."""
+    global FONTS_CACHE
+    if not FONTS_CACHE:
+        for tool, cfg in TOOL_CONFIGS.items():
+            FONTS_CACHE[tool] = []
+            for var in cfg['variants']:
+                try:
+                    font_obj = ImageFont.truetype(var['path'], size=var['fontsize'])
+                    # Cache the layout configurations coupled together with the TTF object
+                    FONTS_CACHE[tool].append((font_obj, var))
+                except IOError:
+                    # Fallback configuration safeguard
+                    FONTS_CACHE[tool].append((ImageFont.load_default(), var))
+    return FONTS_CACHE
 
-    # Initialize font assets mapping
-    fonts = {}
-    for tool, cfg in TOOL_CONFIGS.items():
-        try:
-            fonts[tool] = ImageFont.truetype(cfg['font_path'], size=cfg['fontsize'])
-        except IOError:
-            fonts[tool] = ImageFont.load_default()
-
+def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type: str = "register") -> tuple:
+    fonts = get_cached_fonts()
     pages = []
+    page_offsets = [0]
     
-    # Helper to generate a fresh canvas layer
     def create_new_page():
-        img = Image.open(bg_image_path)
-        draw = ImageDraw.Draw(img)
-        return img, draw
+        img = get_base_image(bg_image_path)
+        return img, ImageDraw.Draw(img)
 
-    # Instantiate page 1
     current_img, current_draw = create_new_page()
     line_idx = 0
     current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
@@ -89,33 +100,33 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list) -> list:
         char, is_bold = structured_chars[idx]
         tool_type = 'marker' if is_bold else 'pen'
         cfg = TOOL_CONFIGS[tool_type]
-        font = fonts[tool_type]
-        
-        # Flag to track if we need to reset line parameters after a page break
-        trigger_page_reset = False
 
-        # --- Handle Newline Breaks ---
+        # Extract both the font true-type object AND its layout properties dictionary
+        available_variants = fonts[tool_type]
+        chosen_font_obj, chosen_font_rules = random.choice(available_variants)
+
         if char == '\n':
             line_idx += 1
             if line_idx >= MAX_LINES_PER_PAGE:
-                # Page Overflow! Save current page and spawn a new one
                 pages.append(current_img)
+                page_offsets.append(idx + 1)
                 current_img, current_draw = create_new_page()
                 line_idx = 0
-            
             current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
             idx += 1
             continue
 
-        # --- Smart Word Lookahead (Wraps words together seamlessly) ---
-        if char != ' ' and (idx == 0 or structured_chars[idx-1][0] in [' ', '\n']):
+        # Word wrap bound check using safe structural proxy bounds
+        if char not in [' ', '\t'] and (idx == 0 or structured_chars[idx-1][0] in [' ', '\n', '\t']):
             word_width = 0
             lookahead_idx = idx
             while lookahead_idx < len(structured_chars):
                 l_char, l_bold = structured_chars[lookahead_idx]
-                if l_char in [' ', '\n']: break
+                if l_char in [' ', '\n', '\t']: break
+                
                 l_tool = 'marker' if l_bold else 'pen'
-                bbox = current_draw.textbbox((0, 0), l_char, font=fonts[l_tool])
+                proxy_font = fonts[l_tool][0][0] # Access base TrueType font object for bounds lookup
+                bbox = current_draw.textbbox((0, 0), l_char, font=proxy_font)
                 word_width += (bbox[2] - bbox[0])
                 lookahead_idx += 1
             
@@ -123,24 +134,26 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list) -> list:
                 line_idx += 1
                 if line_idx >= MAX_LINES_PER_PAGE:
                     pages.append(current_img)
+                    page_offsets.append(idx)
                     current_img, current_draw = create_new_page()
                     line_idx = 0
                 current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
 
-        # --- Draw Character to current page ---
-        current_line_nodes = MASTER_LINE_COORDINATES[line_idx]
-        dynamic_y = get_interpolated_y(current_x, current_line_nodes)
-        y_adjusted = dynamic_y - cfg['ybias']
+        # Render characters while tracking dynamic variant rules safely
+        dynamic_y = get_interpolated_y(current_x, MASTER_LINE_COORDINATES[line_idx])
         
-        current_draw.text((current_x, y_adjusted), char, font=font, fill=cfg['color'])
+        current_draw.text(
+            (current_x, dynamic_y - chosen_font_rules['ybias']), 
+            char, 
+            font=chosen_font_obj, 
+            fill=cfg['color'],
+            stroke_width=chosen_font_rules['stroke_width'], # Applied per individual font rules!
+            stroke_fill=cfg['color']
+        )
         
-        # Advance tracking cursor layout step
-        bbox = current_draw.textbbox((0, 0), char, font=font)
-        char_width = (bbox[2] - bbox[0]) if (bbox[2] - bbox[0]) > 0 else 8
-        current_x += char_width
-        
+        bbox = current_draw.textbbox((0, 0), char, font=chosen_font_obj)
+        current_x += (bbox[2] - bbox[0]) if (bbox[2] - bbox[0]) > 0 else 8
         idx += 1
 
-    # Append the final page being processed
     pages.append(current_img)
-    return pages
+    return pages, page_offsets
