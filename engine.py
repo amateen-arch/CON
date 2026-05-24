@@ -8,14 +8,14 @@ TOOL_CONFIGS = {
     'pen': {
         'color': (12, 28, 94, 255),
         'variants': [
-            {'path': 'assets/pen.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+            {'path': 'assets/pen1.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
             {'path': 'assets/pen2.ttf', 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
         ]
     },
     'marker': {
         'color': (40, 65, 135, 255),
         'variants': [
-            {'path': 'assets/marker.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},     # Normal marker
+            {'path': 'assets/marker1.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},     # Normal marker
             {'path': 'assets/marker2.ttf', 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}    # <--- Made this a bit bolder!
         ]
     }
@@ -75,10 +75,8 @@ def get_cached_fonts():
             for var in cfg['variants']:
                 try:
                     font_obj = ImageFont.truetype(var['path'], size=var['fontsize'])
-                    # Cache the layout configurations coupled together with the TTF object
                     FONTS_CACHE[tool].append((font_obj, var))
                 except IOError:
-                    # Fallback configuration safeguard
                     FONTS_CACHE[tool].append((ImageFont.load_default(), var))
     return FONTS_CACHE
 
@@ -101,10 +99,10 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
         tool_type = 'marker' if is_bold else 'pen'
         cfg = TOOL_CONFIGS[tool_type]
 
-        # Extract both the font true-type object AND its layout properties dictionary
         available_variants = fonts[tool_type]
         chosen_font_obj, chosen_font_rules = random.choice(available_variants)
 
+        # Handle explicit line break layout commands
         if char == '\n':
             line_idx += 1
             if line_idx >= MAX_LINES_PER_PAGE:
@@ -114,32 +112,43 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
                 line_idx = 0
             current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
             idx += 1
+            return_triggered = True
             continue
 
-        # Word wrap bound check using safe structural proxy bounds
-        if char not in [' ', '\t'] and (idx == 0 or structured_chars[idx-1][0] in [' ', '\n', '\t']):
-            word_width = 0
+        # Lookahead boundary calculation for upcoming structural words
+        word_width = 0
+        is_word_start = char not in [' ', '\t'] and (idx == 0 or structured_chars[idx-1][0] in [' ', '\n', '\t'])
+        
+        if is_word_start:
             lookahead_idx = idx
             while lookahead_idx < len(structured_chars):
                 l_char, l_bold = structured_chars[lookahead_idx]
                 if l_char in [' ', '\n', '\t']: break
                 
                 l_tool = 'marker' if l_bold else 'pen'
-                proxy_font = fonts[l_tool][0][0] # Access base TrueType font object for bounds lookup
+                proxy_font = fonts[l_tool][0][0] 
                 bbox = current_draw.textbbox((0, 0), l_char, font=proxy_font)
                 word_width += (bbox[2] - bbox[0])
                 lookahead_idx += 1
-            
-            if current_x + word_width > MAX_X_BOUNDARY:
-                line_idx += 1
-                if line_idx >= MAX_LINES_PER_PAGE:
-                    pages.append(current_img)
-                    page_offsets.append(idx)
-                    current_img, current_draw = create_new_page()
-                    line_idx = 0
-                current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
 
-        # Render characters while tracking dynamic variant rules safely
+        # Check single-character width bounding logic to measure ahead accurately
+        char_bbox = current_draw.textbbox((0, 0), char, font=chosen_font_obj)
+        char_w = (char_bbox[2] - char_bbox[0]) if (char_bbox[2] - char_bbox[0]) > 0 else 8
+
+        # --- RE-ENGINEERED WRAPPING CRITERIA ---
+        # Trigger line break if word exceeds line limit OR if a single character breaks margin bounds
+        should_wrap = (is_word_start and (current_x + word_width > MAX_X_BOUNDARY) and (word_width <= (MAX_X_BOUNDARY - MASTER_LINE_COORDINATES[line_idx][0][0]))) or (current_x + char_w > MAX_X_BOUNDARY)
+
+        if should_wrap:
+            line_idx += 1
+            if line_idx >= MAX_LINES_PER_PAGE:
+                pages.append(current_img)
+                page_offsets.append(idx)
+                current_img, current_draw = create_new_page()
+                line_idx = 0
+            current_x = MASTER_LINE_COORDINATES[line_idx][0][0]
+
+        # Calculate dynamic text placement base coordinates
         dynamic_y = get_interpolated_y(current_x, MASTER_LINE_COORDINATES[line_idx])
         
         current_draw.text(
@@ -147,12 +156,12 @@ def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type
             char, 
             font=chosen_font_obj, 
             fill=cfg['color'],
-            stroke_width=chosen_font_rules['stroke_width'], # Applied per individual font rules!
+            stroke_width=chosen_font_rules['stroke_width'], 
             stroke_fill=cfg['color']
         )
         
-        bbox = current_draw.textbbox((0, 0), char, font=chosen_font_obj)
-        current_x += (bbox[2] - bbox[0]) if (bbox[2] - bbox[0]) > 0 else 8
+        # Increment cursor coordinate positions
+        current_x += char_w
         idx += 1
 
     pages.append(current_img)

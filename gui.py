@@ -10,7 +10,7 @@ class RegisterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Premium High-Speed Writer Workspace")
-        self.root.geometry("1350x850")
+        self.root.geometry("1400x900") 
         
         self.paper_paths = {
             "Register Page": "assets/register_bg.png",
@@ -29,52 +29,66 @@ class RegisterApp:
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # --- LEFT PANEL ---
+        # --- LEFT PANEL (TEXT EDITOR WITH TOP TOOLBAR) ---
         left_frame = ttk.Frame(main_paned)
-        main_paned.add(left_frame, weight=3)
+        main_paned.add(left_frame, weight=1) 
         
         toolbar = ttk.Frame(left_frame)
         toolbar.pack(fill=tk.X, pady=(0, 5))
         
-        ttk.Button(toolbar, text="🖍️ Set Marker (Bold)", command=self.apply_marker_format).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🖊️ Reset Pen (Plain)", command=self.clear_marker_format).pack(side=tk.LEFT, padx=2)
+        # Tools packed to the left
+        ttk.Button(toolbar, text="🖍️ Marker", command=self.apply_marker_format).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="🖊️ Pen", command=self.clear_marker_format).pack(side=tk.LEFT, padx=2)
         
-        # --- MANUAL ACTION BUTTON + NOTICE ---
-        self.btn_apply = tk.Button(toolbar, text="⚡ Apply Changes to Canvas", font=("Arial", 10, "bold"), bg="#0078d7", fg="white", activebackground="#005a9e", activeforeground="white", padx=10, command=self.trigger_canvas_render)
-        self.btn_apply.pack(side=tk.LEFT, padx=10)
+        self.btn_apply = tk.Button(toolbar, text="⚡ Apply", font=("Arial", 9, "bold"), bg="#0078d7", fg="white", activebackground="#005a9e", activeforeground="white", padx=6, command=self.trigger_canvas_render)
+        self.btn_apply.pack(side=tk.LEFT, padx=5)
         
-        self.reminder_label = ttk.Label(toolbar, text="◀ Click to update page views after highlighting!", font=("Arial", 9, "italic"), foreground="#cc1111")
-        self.reminder_label.pack(side=tk.LEFT, padx=5)
+        # --- ADDED: Reminder text typed right next to the Apply button ---
+        self.reminder_lbl = ttk.Label(
+            toolbar, 
+            text="Always click apply for the changes to appear!", 
+            font=("Arial", 9, "italic"), 
+            foreground="#a02020"
+        )
+        self.reminder_lbl.pack(side=tk.LEFT, padx=5)
         
-        # --- TEXT EDITOR WITH NATIVE UNDO STACK ACTIVATED ---
+        # Save PDF button at the top-right corner of the editor panel
+        ttk.Button(toolbar, text="💾 Save PDF", command=self.save_as_pdf).pack(side=tk.RIGHT, padx=2)
+        
+        # Text input container matching margins exactly
+        editor_scroll_container = ttk.Frame(left_frame)
+        editor_scroll_container.pack(fill=tk.Y, side=tk.LEFT, expand=False)
+
         self.text_editor = tk.Text(
-            left_frame, 
+            editor_scroll_container, 
             wrap=tk.WORD, 
             font=("Courier", 14), 
-            spacing3=6, 
+            spacing3=8, 
             insertbackground='black',
-            undo=True,          # Tells Tkinter to maintain an internal undo history
-            maxundo=100,        # Prevents infinite memory allocation leaks
-            autoseparators=True # Automatically breaks history steps on spaces/returns
+            undo=True,          
+            maxundo=100,        
+            autoseparators=True,
+            width=58,
+            padx=20,
+            pady=15
         )
-        self.text_editor.pack(fill=tk.BOTH, expand=True)
+        self.text_editor.pack(fill=tk.Y, side=tk.LEFT, expand=False)
         self.text_editor.tag_configure("bold_marker", font=("Courier", 14, "bold"), foreground="#060E37")
         self.text_editor.focus_set()
         
-        # --- KEYBOARD SHORTCUT BINDINGS FOR UNDO / REDO ---
+        text_scroll = ttk.Scrollbar(editor_scroll_container, orient=tk.VERTICAL, command=self.text_editor.yview)
+        self.text_editor.configure(yscrollcommand=text_scroll.set)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
         self.text_editor.bind("<Control-z>", self.handle_undo)
         self.text_editor.bind("<Control-y>", self.handle_redo)
         self.text_editor.bind("<Command-z>", self.handle_undo)
         self.text_editor.bind("<Command-Shift-Z>", self.handle_redo)
         self.text_editor.bind("<Command-y>", self.handle_redo)
-        
-        button_bar = ttk.Frame(left_frame)
-        button_bar.pack(fill=tk.X, pady=(5, 0))
-        ttk.Button(button_bar, text="💾 Save as Multi-Page PDF", command=self.save_as_pdf).pack(side=tk.RIGHT, padx=5)
 
-        # --- MIDDLE PANEL ---
+        # --- MIDDLE PANEL (ACTIVE PAGE PREVIEW) ---
         middle_frame = ttk.LabelFrame(main_paned, text=" Active Page View ")
-        main_paned.add(middle_frame, weight=4)
+        main_paned.add(middle_frame, weight=6) 
         
         self.preview_container = ttk.Frame(middle_frame)
         self.preview_container.pack(fill=tk.BOTH, expand=True)
@@ -91,14 +105,17 @@ class RegisterApp:
         self.status_lbl = ttk.Label(paper_selection_bar, text="Page 1 of 1", font=("Arial", 10, "bold"))
         self.status_lbl.pack(side=tk.RIGHT, padx=10)
 
-        self.big_preview_label = ttk.Label(self.preview_container, anchor=tk.CENTER)
-        self.big_preview_label.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.view_stack = ttk.Frame(self.preview_container)
+        self.view_stack.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.overlay_layer = tk.Frame(self.big_preview_label, bg="#ffffff")
+        self.big_preview_label = ttk.Label(self.view_stack, anchor=tk.CENTER)
+        self.big_preview_label.pack(fill=tk.BOTH, expand=True)
+
+        self.overlay_layer = tk.Frame(self.view_stack, bg="#ffffff")
         self.spinner_canvas = tk.Canvas(self.overlay_layer, width=180, height=100, bg="#ffffff", highlightthickness=0)
         self.spinner_canvas.pack(expand=True)
         
-        # --- RIGHT PANEL ---
+        # --- RIGHT PANEL (PAGES LIST THUMBNAILS WITH FIXES) ---
         right_frame = ttk.LabelFrame(main_paned, text=" Pages ")
         main_paned.add(right_frame, weight=1)
         
@@ -111,27 +128,31 @@ class RegisterApp:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.flash_reminder_animation()
+        self.thumb_canvas.bind_all("<MouseWheel>", self.on_mousewheel_scroll) 
+        self.thumb_canvas.bind_all("<Button-4>", self.on_mousewheel_scroll)  
+        self.thumb_canvas.bind_all("<Button-5>", self.on_mousewheel_scroll)  
+
+    def on_mousewheel_scroll(self, event):
+        x, y = self.root.winfo_pointerxy()
+        widget_under_mouse = self.root.winfo_containing(x, y)
+        
+        if widget_under_mouse and (str(widget_under_mouse).startswith(str(self.thumb_canvas)) or "thumb" in str(widget_under_mouse)):
+            if event.num == 4:    
+                self.thumb_canvas.yview_scroll(-1, "units")
+            elif event.num == 5:  
+                self.thumb_canvas.yview_scroll(1, "units")
+            else:                 
+                self.thumb_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def handle_undo(self, event=None):
-        try:
-            self.text_editor.edit_undo()
-        except tk.TclError:
-            pass 
+        try: self.text_editor.edit_undo()
+        except tk.TclError: pass 
         return "break" 
 
     def handle_redo(self, event=None):
-        try:
-            self.text_editor.edit_redo()
-        except tk.TclError:
-            pass 
+        try: self.text_editor.edit_redo()
+        except tk.TclError: pass 
         return "break"
-
-    def flash_reminder_animation(self):
-        current_color = self.reminder_label.cget("foreground")
-        next_color = "#f4f4f4" if current_color == "#cc1111" else "#cc1111"
-        self.reminder_label.configure(foreground=next_color)
-        self.root.after(800, self.flash_reminder_animation)
 
     def show_processing_spinner(self):
         self.overlay_layer.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
@@ -150,21 +171,17 @@ class RegisterApp:
         self.overlay_layer.place_forget()
 
     def apply_marker_format(self):
-        """Applies bold marker tag with validation check."""
         if not self.text_editor.tag_ranges("sel"):
-            messagebox.showwarning("Selection Required", "Please select some text first to apply the marker layout!")
+            messagebox.showwarning("Selection Required", "Please select some text first!")
             return
-        try: 
-            self.text_editor.tag_add("bold_marker", "sel.first", "sel.last")
+        try: self.text_editor.tag_add("bold_marker", "sel.first", "sel.last")
         except tk.TclError: pass
 
     def clear_marker_format(self):
-        """Removes bold marker tag with validation check."""
         if not self.text_editor.tag_ranges("sel"):
-            messagebox.showwarning("Selection Required", "Please select some text first to apply the pen layout!")
+            messagebox.showwarning("Selection Required", "Please select some text first!")
             return
-        try: 
-            self.text_editor.tag_remove("bold_marker", "sel.first", "sel.last")
+        try: self.text_editor.tag_remove("bold_marker", "sel.first", "sel.last")
         except tk.TclError: pass
 
     def trigger_canvas_render(self):
@@ -192,19 +209,15 @@ class RegisterApp:
         engine_paper_tag = "a4" if "A4" in selected_paper_name else "register"
 
         try:
-            old_page_count = len(self.generated_pages_stream)
             self.generated_pages_stream, self.page_offsets = render_chars_to_pages(chosen_bg_path, structured_chars, paper_type=engine_paper_tag)
-            new_page_count = len(self.generated_pages_stream)
             
-            if new_page_count > old_page_count:
-                self.selected_viewing_page_idx = new_page_count - 1
-            if self.selected_viewing_page_idx >= new_page_count:
-                self.selected_viewing_page_idx = new_page_count - 1
+            # Force the view index to stick onto the very first page
+            self.selected_viewing_page_idx = 0
                 
             self.refresh_thumbnails_sidebar()
             self.switch_active_preview_page(self.selected_viewing_page_idx, auto_scroll_text=False)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Render Error: {e}")
         finally:
             self.root.after(150, self.hide_processing_spinner)
 
@@ -212,7 +225,10 @@ class RegisterApp:
         if 0 <= page_index < len(self.generated_pages_stream):
             self.selected_viewing_page_idx = page_index
             display_img = self.generated_pages_stream[page_index].copy()
-            display_img.thumbnail((550, 680))
+            
+            # Scaled constraints safely to 500x720 to show whole image perfectly
+            display_img.thumbnail((500, 720))
+            
             self.main_preview_photo = ImageTk.PhotoImage(display_img)
             self.big_preview_label.configure(image=self.main_preview_photo)
             self.status_lbl.configure(text=f"Page {page_index + 1} of {len(self.generated_pages_stream)}")
