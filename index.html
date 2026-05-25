@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Page Workspace</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f1f5f9;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Workspace Header Ribbon */
+        .word-toolbar {
+            width: 100%;
+            height: 65px;
+            background-color: #ffffff;
+            border-bottom: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            box-sizing: border-box;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .app-badge {
+            background-color: #0c1c5e;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .document-title {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 15px;
+        }
+
+        /* Ink Color Palette Selection Ribbon */
+        .color-ribbon {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 6px 14px;
+            border-radius: 30px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .ribbon-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-right: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.15);
+        }
+
+        .color-swatch.active {
+            border-color: #ffffff;
+            outline: 2px solid #0f172a;
+            transform: scale(1.05);
+        }
+
+        .word-page-indicator {
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            background-color: #f1f5f9;
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        /* Workspace Scroll Area Container */
+        .workspace-scroll-viewport {
+            flex: 1;
+            width: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+
+        .canvas-page-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 35px;
+            padding-top: 35px;
+            padding-bottom: 80px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Premium Minimalist Sheet Frame Component */
+        .page-wrapper {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06), 0 1px 8px rgba(0, 0, 0, 0.02);
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            background-color: #ffffff;
+            max-height: calc(100vh - 145px);
+            width: auto;
+            aspect-ratio: 800 / 1130;
+            cursor: text;
+        }
+
+        .register-sheet {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #hiddenDocumentCaptureInput {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            left: 0;
+            top: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="word-toolbar">
+        <div class="brand-group">
+            <div class="app-badge">Register</div>
+            <div class="document-title">Assignment Notebook.reg</div>
+        </div>
+
+        <div class="color-ribbon" id="inkColorRibbon">
+            <span class="ribbon-label">Ink Color</span>
+            <div class="color-swatch active" data-color="#0c1c5e" style="background-color: #0c1c5e;" title="Pen Blue"></div>
+            <div class="color-swatch" data-color="#060c2b" style="background-color: #060c2b;" title="Marker Dark Blue"></div>
+            <div class="color-swatch" data-color="#1e293b" style="background-color: #1e293b;" title="Standard Black"></div>
+            <div class="color-swatch" data-color="#dc2626" style="background-color: #dc2626;" title="Correction Red"></div>
+            <div class="color-swatch" data-color="#16a34a" style="background-color: #16a34a;" title="Accent Green"></div>
+        </div>
+
+        <div class="word-page-indicator" id="globalPageCounter">Page 1 of 1</div>
+    </div>
+
+    <div class="workspace-scroll-viewport" id="scrollViewport">
+        <div class="canvas-page-stack" id="canvasPageStack"></div>
+    </div>
+
+    <input type="text" id="hiddenDocumentCaptureInput" autocomplete="off" aria-hidden="true">
+
+    <script src="notebookConfig.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
