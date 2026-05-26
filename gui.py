@@ -160,7 +160,7 @@ class RegisterApp:
         try: self.text_editor.edit_undo()
         except tk.TclError: pass 
         return "break" 
-
+# AI WROTE ALL THIS CODE TwT
     def handle_redo(self, event=None):
         try: self.text_editor.edit_redo()
         except tk.TclError: pass 

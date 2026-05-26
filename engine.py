@@ -12,25 +12,9 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-# Restructured to support distinct font profiles natively with dynamic resource paths
+# The pair of fonts i used to randomize together
 TOOL_CONFIGS = {
     'Font 1': {
-        'pen': {
-            'color': (12, 28, 94, 255),
-            'variants': [
-                {'path': resource_path('assets/pen1.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
-                {'path': resource_path('assets/pen2.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
-            ]
-        },
-        'marker': {
-            'color': (40, 65, 135, 255),
-            'variants': [
-                {'path': resource_path('assets/marker1.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
-                {'path': resource_path('assets/marker2.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
-            ]
-        }
-    },
-    'Font 2': {
         'pen': {
             'color': (12, 28, 94, 255),
             'variants': [
@@ -45,9 +29,26 @@ TOOL_CONFIGS = {
                 {'path': resource_path('assets/marker2.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
             ]
         }
+    },
+    'Font 2': {
+        'pen': {
+            'color': (12, 28, 94, 255),
+            'variants': [
+                {'path': resource_path('assets/pen1.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0},
+                {'path': resource_path('assets/pen2.ttf'), 'fontsize': 22, 'ybias': 22, 'stroke_width': 0}
+            ]
+        },
+        'marker': {
+            'color': (40, 65, 135, 255),
+            'variants': [
+                {'path': resource_path('assets/marker1.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1},
+                {'path': resource_path('assets/marker2.ttf'), 'fontsize': 28, 'ybias': 27, 'stroke_width': 1}
+            ]
+        }
     }
 }
 
+# Hardcoded coordinates of my register
 MASTER_LINE_COORDINATES = [
     [(50, 186), (90, 186), (130, 186), (170, 186), (210, 186), (250, 186), (290, 187), (330, 187), (370, 188), (410, 188), (450, 188), (490, 188), (530, 188), (570, 187), (610, 187), (650, 186), (690, 186), (730, 186)],
     [(50, 234), (90, 235), (130, 235), (170, 235), (210, 235), (250, 235), (290, 235), (330, 236), (370, 236), (410, 237), (450, 237), (490, 237), (530, 236), (570, 236), (610, 236), (650, 235), (690, 234), (730, 234)],
@@ -76,6 +77,7 @@ MAX_X_BOUNDARY = 730
 MAX_LINES_PER_PAGE = len(MASTER_LINE_COORDINATES)
 IMAGE_CACHE = {}
 
+#load the background img from assets
 def get_base_image(bg_image_path: str):
     # Resolve background paths dynamically too
     resolved_path = resource_path(bg_image_path)
@@ -85,6 +87,7 @@ def get_base_image(bg_image_path: str):
         IMAGE_CACHE[resolved_path] = Image.open(resolved_path)
     return IMAGE_CACHE[resolved_path].copy()
 
+#The notebook lines are slightly curved/slanted instead of perfectly straight. We use linear interpolation
 def get_interpolated_y(current_x: float, line_coordinates: list) -> float:
     if current_x <= line_coordinates[0][0]: return line_coordinates[0][1]
     if current_x >= line_coordinates[-1][0]: return line_coordinates[-1][1]
@@ -95,6 +98,7 @@ def get_interpolated_y(current_x: float, line_coordinates: list) -> float:
     return line_coordinates[0][1]
 
 FONTS_CACHE = {}
+#Loads all fonts
 def get_cached_fonts(font_profile: str):
     """Loads and caches actual font objects paired with their profile keys."""
     global FONTS_CACHE
@@ -110,6 +114,7 @@ def get_cached_fonts(font_profile: str):
                 except IOError:
                     FONTS_CACHE[font_profile][tool].append((ImageFont.load_default(), var))
     return FONTS_CACHE[font_profile]
+
 
 def render_chars_to_pages(bg_image_path: str, structured_chars: list, paper_type: str = "register", font_profile: str = "Font 1") -> tuple:
     fonts = get_cached_fonts(font_profile)

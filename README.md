@@ -43,7 +43,7 @@ For new users looking to download, set up, and run this project locally, execute
 ```bash
 # 1. Clone the repository and enter the project folder
 git clone "https://github.com/amateen-arch/TextToHandwriting" (without the double comma)
-cd YOUR_REPOSITORY_NAME
+cd TextToHandwriting
 
 # 2. Install all required setup dependencies
 pip install -r requirements.txt
