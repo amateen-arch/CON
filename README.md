@@ -1,6 +1,6 @@
 # 📝 Text-to-Handwriting Converter
 
-A simple Python application that takes digital text and converts it into realistic, handwritten pages. Perfect for assignments, notes, or creating personalized documents.
+A simple Python desktop application that takes digital text and converts it into realistic, handwritten pages. Perfect for assignments, notes, or creating personalized documents.
 
 ---
 
@@ -9,11 +9,6 @@ A simple Python application that takes digital text and converts it into realist
 * **Choose Your Page:** Swap between a standard **A4 Plain Paper** or a classic **Lined Register Sheet**.
 * **Font Variety:** Select between **2 distinct handwriting fonts** to match your style.
 * **Instant PDF Export:** Saves your final generated pages directly as a ready-to-submit **PDF**.
-
-## 📁 Project Structure
-* `gui.py` — The control panel. Pick your pen, paper, font, paste your text, and hit export.
-* `engine.py` — The magic under the hood. It handles the text wrapping, spacing, and image rendering.
-* `assets/` — Stores the high-res paper textures (A4 & Register) and custom handwriting fonts.
 
 ---
 
@@ -26,9 +21,32 @@ A simple Python application that takes digital text and converts it into realist
 
 ---
 
-## 🚀 How to Run It
+## 📁 Project Structure
+* `gui.py` — The control panel. Pick your pen, paper, font, paste your text, and hit export.
+* `engine.py` — The magic under the hood. It handles the text wrapping, spacing, and image rendering.
+* `assets/` — Stores the high-res paper textures (A4 & Register) and custom handwriting fonts.
 
-### 1. Install Dependencies
-Make sure you have Python installed, then install the required libraries using your terminal:
+---
+
+## 🚧 Current Status & Future Roadmap
+* **Current Release:** The desktop GUI version is fully stable, complete, and ready to use!
+* **Next Up:** I am actively building a **Web Application version** of this tool on a separate development branch so users can use it right from their browsers instead of downloading it.
+
+> 🤝 **Looking for Collaborators!** If you want to help transition this logic to a web app (or just want to talk Python), I'd love to team up. Check out the codebase, DM me on Reddit, or open an issue here!
+
+---
+
+## 🚀 How to Clone and Run It
+
+For new users looking to download, set up, and run this project locally, execute the following commands in your terminal or command prompt:
+
 ```bash
+# 1. Clone the repository and enter the project folder
+git clone "https://github.com/amateen-arch/TextToHandwriting" (without the double comma)
+cd YOUR_REPOSITORY_NAME
+
+# 2. Install all required setup dependencies
 pip install -r requirements.txt
+
+# 3. Launch the application
+python gui.py
